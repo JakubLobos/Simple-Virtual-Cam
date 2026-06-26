@@ -40,7 +40,14 @@ jobs:
           files: dist/VirtualCam.exe
 
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13
+            arch: Intel
+          - runner: macos-latest
+            arch: AppleSilicon
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,19 +62,19 @@ jobs:
           pip3 install pyinstaller
 
       - name: Build app
-        run: pyinstaller --onefile --windowed --name VirtualCam --target-arch universal2 app.py
+        run: pyinstaller --onedir --windowed --name VirtualCam app.py
 
       - name: Zip .app
-        run: cd dist && zip -r VirtualCam-macOS.zip VirtualCam.app
+        run: cd dist && zip -r VirtualCam-macOS-${{ matrix.arch }}.zip VirtualCam.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VirtualCam-macOS
-          path: dist/VirtualCam-macOS.zip
+          name: VirtualCam-macOS-${{ matrix.arch }}
+          path: dist/VirtualCam-macOS-${{ matrix.arch }}.zip
 
       - name: Upload to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/VirtualCam-macOS.zip
+          files: dist/VirtualCam-macOS-${{ matrix.arch }}.zip
