@@ -1,7 +1,13 @@
 #!/bin/bash
 set -e
 
-pip install -r requirements.txt
+PIP=$(command -v pip3 || command -v pip)
+if [ -z "$PIP" ]; then
+    echo "Error: pip not found. Install Python 3 from https://python.org"
+    exit 1
+fi
+
+$PIP install -r requirements.txt
 
 OS="$(uname -s)"
 
