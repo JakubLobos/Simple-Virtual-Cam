@@ -55,7 +55,7 @@ jobs:
           pip3 install pyinstaller
 
       - name: Build app
-        run: pyinstaller --onefile --windowed --name VirtualCam app.py
+        run: pyinstaller --onefile --windowed --name VirtualCam --target-arch universal2 app.py
 
       - name: Zip .app
         run: cd dist && zip -r VirtualCam-macOS.zip VirtualCam.app
