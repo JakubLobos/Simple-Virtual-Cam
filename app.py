@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 import threading
 import platform
 import os
-import cv2
+import imageio
 import pyvirtualcam
 
 SYSTEM = platform.system()
@@ -25,15 +25,15 @@ def format_size(path):
         return ""
 
 def get_video_info(path):
-    cap = cv2.VideoCapture(path)
-    if not cap.isOpened():
+    try:
+        reader = imageio.get_reader(path)
+        meta = reader.get_meta_data()
+        reader.close()
+    except Exception:
         return None
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    duration = frames / fps if fps > 0 else 0
-    cap.release()
+    w, h = meta.get("size", (0, 0))
+    fps = meta.get("fps", 0)
+    duration = meta.get("duration", 0)
     mins = int(duration // 60)
     secs = int(duration % 60)
     return {"res": f"{w}×{h}", "fps": f"{fps:.0f} fps", "dur": f"{mins}:{secs:02d}", "size": format_size(path)}
@@ -221,16 +221,17 @@ class VirtualCamApp:
         self._dot_job = self.root.after(500, self._animate_dots)
 
     def stream_loop(self):
-        cap = cv2.VideoCapture(self.video_path)
-        if not cap.isOpened():
+        backend = get_backend()
+        try:
+            reader = imageio.get_reader(self.video_path)
+            meta = reader.get_meta_data()
+            reader.close()
+            width, height = meta.get("size")
+            fps = meta.get("fps") or 30
+        except Exception:
             self.root.after(0, lambda: messagebox.showerror("Error", "Cannot open video file."))
             self.root.after(0, self.stop)
             return
-
-        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps    = cap.get(cv2.CAP_PROP_FPS) or 30
-        backend = get_backend()
 
         try:
             with pyvirtualcam.Camera(width=width, height=height, fps=fps, backend=backend) as cam:
@@ -238,12 +239,15 @@ class VirtualCamApp:
                 self.root.after(0, lambda: self.status_var.set("Streaming"))
                 self.root.after(0, lambda: self.device_var.set(device))
                 while self.running:
-                    ret, frame = cap.read()
-                    if not ret:
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        continue
-                    cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    cam.sleep_until_next_frame()
+                    reader = imageio.get_reader(self.video_path)
+                    for frame in reader:
+                        if not self.running:
+                            break
+                        if frame.shape[-1] == 4:
+                            frame = frame[:, :, :3]
+                        cam.send(frame)
+                        cam.sleep_until_next_frame()
+                    reader.close()
         except Exception as e:
             hints = {
                 "Linux":  "Install v4l2loopback:\n  sudo apt install v4l2loopback-dkms\n  sudo modprobe v4l2loopback",
@@ -254,8 +258,6 @@ class VirtualCamApp:
             msg = f"{e}\n\n{hint}"
             self.root.after(0, lambda: messagebox.showerror("Driver error", msg))
             self.root.after(0, self.stop)
-        finally:
-            cap.release()
 
     def on_close(self):
         self.running = False

@@ -53,7 +53,7 @@ Some applications (proctoring software, anti-cheat systems, etc.) detect and blo
 
 ## How it works
 
-VirtualCam uses [pyvirtualcam](https://github.com/letmaik/pyvirtualcam) to push video frames directly into the OBS virtual camera driver (Windows/macOS) or v4l2loopback (Linux). OBS Studio only needs to be installed for its driver — it does not need to be running.
+VirtualCam reads video frames with [imageio](https://github.com/imageio/imageio) and pushes them into a virtual camera driver via [pyvirtualcam](https://github.com/letmaik/pyvirtualcam). The driver comes from OBS Studio (Windows/macOS) or v4l2loopback (Linux). OBS Studio only needs to be installed for its driver — it does not need to be running.
 
 The video loops automatically when it reaches the end.
 
